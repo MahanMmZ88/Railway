@@ -2,10 +2,12 @@ import http from "node:http";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 
-const TARGET_BASE        = (process.env.TARGET_DOMAIN      || "").replace(/\/$/, "");
-const PUBLIC_RELAY_PATH  = normalizeRelayPath(process.env.PUBLIC_RELAY_PATH || "/api");
-const RELAY_PATH         = normalizeRelayPath(process.env.RELAY_PATH        || "/api");
-const RELAY_KEY          = (process.env.RELAY_KEY          || "").trim();
+// گرفتن متغیرها (بدون کرش کردن در صورت خالی بودن)
+const getTargetBase       = () => (process.env.TARGET_DOMAIN      || "").replace(/\/$/, "");
+const getPublicRelayPath  = () => normalizeRelayPath(process.env.PUBLIC_RELAY_PATH || "/api");
+const getRelayPath         = () => normalizeRelayPath(process.env.RELAY_PATH        || "/api");
+const getRelayKey          = () => (process.env.RELAY_KEY          || "").trim();
+
 const UPSTREAM_TIMEOUT_MS = parsePositiveInt(process.env.UPSTREAM_TIMEOUT_MS, 0, 1000);
 const MAX_INFLIGHT       = parsePositiveInt(process.env.MAX_INFLIGHT, 512, 1);
 const PORT               = parseInt(process.env.PORT || "8080", 10);
@@ -31,6 +33,12 @@ let inFlight = 0;
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
 
+  // مقادیر متغیرها در لحظه ریکوئست خوانده می‌شوند
+  const TARGET_BASE = getTargetBase();
+  const PUBLIC_RELAY_PATH = getPublicRelayPath();
+  const RELAY_PATH = getRelayPath();
+  const RELAY_KEY = getRelayKey();
+
   // ── Debug endpoint ──────────────────────────────────────────────────────────
   if (url.pathname === "/__debug") {
     const body = JSON.stringify({
@@ -46,18 +54,41 @@ const server = http.createServer(async (req, res) => {
     return res.end(body);
   }
 
+  // ── نمایش فرانت‌اند Mahan Panel در صورت عدم تنظیم متغیرها ──────────────────────
+  // اگر متغیری ست نشده باشد، سرور کرش نمیکند، بلکه این صفحه راهنما را نشان می‌دهد
+  if (!TARGET_BASE || !RELAY_PATH || !PUBLIC_RELAY_PATH) {
+    res.writeHead(200, { "content-type": "text/html; charset=UTF-8" });
+    return res.end(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Mahan Panel</title>
+        <style>
+          body { background-color: #111; color: #eee; font-family: sans-serif; text-align: center; padding-top: 15%; }
+          h1 { color: #ffcc00; }
+        </style>
+      </head>
+      <body>
+        <h1>Mahan Panel</h1>
+        <p>Server is running. Please configure your Environment Variables in Railway Panel.</p>
+        <hr style="width:200px; border-color:#333;">
+        <p style="font-size:12px; color:#666;">MAHAN CLOUD NETWORK</p>
+      </body>
+      </html>
+    `);
+  }
+
   // ── Config checks ───────────────────────────────────────────────────────────
-  if (!TARGET_BASE)           return end(res, 500, "Misconfigured: TARGET_DOMAIN is not set");
-  if (!RELAY_PATH)            return end(res, 500, "Misconfigured: RELAY_PATH is not set");
   if (RELAY_PATH === "/")     return end(res, 500, "Misconfigured: RELAY_PATH cannot be '/'");
-  if (!PUBLIC_RELAY_PATH)     return end(res, 500, "Misconfigured: PUBLIC_RELAY_PATH is not set");
   if (PUBLIC_RELAY_PATH==="/")return end(res, 500, "Misconfigured: PUBLIC_RELAY_PATH cannot be '/'");
   if (RELAY_KEY && RELAY_KEY.length < 16) return end(res, 500, "Misconfigured: RELAY_KEY is too short");
 
   // ── Routing ─────────────────────────────────────────────────────────────────
   const normalizedPath = normalizeIncomingPath(url.pathname);
-  if (!isAllowedRelayPath(normalizedPath, PUBLIC_RELAY_PATH))
-    return end(res, 404, "Not Found");
+  if (!isAllowedRelayPath(normalizedPath, PUBLIC_RELAY_PATH)) {
+    res.writeHead(404, { "content-type": "text/html; charset=UTF-8" });
+    return res.end("<h1>Mahan Panel</h1><p>404 Not Found</p>");
+  }
 
   if (!ALLOWED_METHODS.has(req.method))
     return end(res, 405, "Method Not Allowed", { allow: "GET, HEAD, POST" });
@@ -141,7 +172,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`XHTTP Relay listening on port ${PORT}`);
+  console.log(`MAHAN XHTTP Relay listening on port ${PORT}`);
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
