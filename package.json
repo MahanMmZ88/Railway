@@ -1,8 +1,8 @@
 {
-  "name": "avaco",
+  "name": "mahan",
   "version": "1.0.0",
   "type": "module",
-  "description": "Railway relay for avaco",
+  "description": "Railway core relay powered by MAHAN CLOUD NETWORK",
   "scripts": {
     "start": "node src/index.js"
   },
