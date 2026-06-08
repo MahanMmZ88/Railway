@@ -138,11 +138,11 @@ const RESOURCE_SIGNATURES = {
 const getResourceSignature = (pathname, method) => {
   if (method === "POST") return RESOURCE_SIGNATURES.fetch;
   const ext = pathname.split('.').pop().toLowerCase();
-  if (["js","mjs"].includes(ext))                                          return RESOURCE_SIGNATURES.script;
-  if (["css","scss"].includes(ext))                                        return RESOURCE_SIGNATURES.style;
-  if (["png","jpg","jpeg","gif","webp","avif","svg","ico"].includes(ext))  return RESOURCE_SIGNATURES.image;
-  if (["woff","woff2","ttf","eot","otf"].includes(ext))                    return RESOURCE_SIGNATURES.font;
-  if (["mp4","webm","ogg","mp3","wav"].includes(ext))                      return RESOURCE_SIGNATURES.media;
+  if (["js","mjs"].includes(ext))                                         return RESOURCE_SIGNATURES.script;
+  if (["css","scss"].includes(ext))                                       return RESOURCE_SIGNATURES.style;
+  if (["png","jpg","jpeg","gif","webp","avif","svg","ico"].includes(ext)) return RESOURCE_SIGNATURES.image;
+  if (["woff","woff2","ttf","eot","otf"].includes(ext))                   return RESOURCE_SIGNATURES.font;
+  if (["mp4","webm","ogg","mp3","wav"].includes(ext))                     return RESOURCE_SIGNATURES.media;
   return RESOURCE_SIGNATURES.document;
 };
 
@@ -245,12 +245,10 @@ const ALLOWED_RESPONSE_HEADERS = new Set([
 const normalizeResponseHeaders = (response, pathname, startTime) => {
   const normalized = new Headers();
   const status = response.status;
-
   for (const [key, value] of response.headers) {
     const k = key.toLowerCase();
     if (ALLOWED_RESPONSE_HEADERS.has(k) && !LEAKY_HEADERS.has(k)) normalized.set(key, value);
   }
-
   if ([301,302,307,308].includes(status)) {
     const location = response.headers.get("location");
     if (location) {
@@ -258,19 +256,15 @@ const normalizeResponseHeaders = (response, pathname, startTime) => {
       normalized.set("Cache-Control", status === 301 ? "public, max-age=86400" : "no-cache");
     }
   }
-
   const contentLength = response.headers.get("content-length");
   if (contentLength && status !== 204 && status !== 304) normalized.set("Accept-Ranges","bytes");
-
   const originalContentType = response.headers.get("content-type");
   normalized.set("Content-Type", normalizeContentType(originalContentType, pathname));
-
   if (status === 204 || status === 304) {
     normalized.delete("content-length"); normalized.delete("content-type");
   } else if (!normalized.has("content-type")) {
     normalized.set("Content-Type","application/octet-stream");
   }
-
   const duration = Date.now() - startTime;
   normalized.set("Server","cloudflare");
   normalized.set("CF-RAY", generateCloudflareRay());
@@ -356,7 +350,10 @@ const SUSPICIOUS_IPS = new Map();
 
 const getConnectionState = (host) => {
   if (!CONNECTION_STATES.has(host)) {
-    CONNECTION_STATES.set(host, { sessionId: Math.random().toString(36).substring(2,15), created: Date.now() });
+    CONNECTION_STATES.set(host, {
+      sessionId: Math.random().toString(36).substring(2,15),
+      created: Date.now()
+    });
   }
   return CONNECTION_STATES.get(host);
 };
@@ -381,33 +378,6 @@ const gentle_j6x87yva = new Set([
 ]);
 
 const heavyExtensions = ['.mp4','.zip','.pdf','.exe','.iso','.gz','.tar','.dmg','.bin','.msi','.rar'];
-
-// ── fetch صفحه GitHub با redirect:follow ─────────────────
-const fetchGitHubPage = async (finger) => {
-  const targetUrl = injectDynamicEntropy(snow_j6x87yva);
-
-  const headers = new Headers();
-  headers.set("User-Agent", finger.ua);
-  headers.set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-  headers.set("Accept-Language", finger.lang);
-  headers.set("Accept-Encoding", finger.browser === "safari" ? "gzip, deflate, br" : "gzip, deflate, br, zstd");
-  headers.set("Host", "mahanmmz88.github.io");
-
-  if (finger.sec_ch_ua) {
-    headers.set("sec-ch-ua", finger.sec_ch_ua);
-    headers.set("sec-ch-ua-mobile", finger.sec_ch_ua_mobile);
-    headers.set("sec-ch-ua-platform", finger.sec_ch_ua_platform);
-  }
-
-  // redirect: "follow" ← کلید اصلی fix
-  const response = await fetch(targetUrl, {
-    method: "GET",
-    headers,
-    redirect: "follow"
-  });
-
-  return response;
-};
 
 // ── Main Handler ──────────────────────────────────────────
 app.all('*', async (c) => {
@@ -451,54 +421,9 @@ app.all('*', async (c) => {
     const finger = session.finger;
     const fingerId = `${clientIp}-${session.sessionId}`;
 
-    // ── ROOT PATH ─────────────────────────────────────────
-    // همیشه صفحه GitHub رو نشون بده - x-host رو نادیده بگیر
+    // ── ROOT PATH → redirect مستقیم به GitHub Pages ───────
     if (url.pathname === "/" && method === "GET" && !isWebSocket) {
-
-      // ETag check
-      const conditionalResponse = handleConditionalRequest(request, "/");
-      if (conditionalResponse) return conditionalResponse;
-
-      try {
-        const githubResponse = await fetchGitHubPage(finger);
-
-        console.log(`[ROOT] GitHub status: ${githubResponse.status}, url: ${githubResponse.url}`);
-
-        if (!githubResponse.ok) {
-          console.error(`[ROOT] GitHub returned ${githubResponse.status}`);
-          return maskErrorResponse(502);
-        }
-
-        const githubContent = await githubResponse.text();
-        console.log(`[ROOT] Content length: ${githubContent.length}`);
-
-        if (githubContent.length < 100) {
-          console.error(`[ROOT] Content too short, something wrong`);
-          return maskErrorResponse(502);
-        }
-
-        sendDecoyRequest(snow_j6x87yva, finger);
-
-        const rootEtag = generateETag("/", String(githubContent.length));
-        ETAG_CACHE.set("/", { etag: rootEtag, cacheControl: "public, max-age=3600" });
-
-        return new Response(githubContent, {
-          status: 200,
-          headers: {
-            "Content-Type": "text/html; charset=UTF-8",
-            "Cache-Control": "public, max-age=3600",
-            "ETag": rootEtag,
-            "Server": "cloudflare",
-            "CF-RAY": generateCloudflareRay(),
-            "X-Content-Type-Options": "nosniff",
-            "Access-Control-Allow-Origin": "*"
-          }
-        });
-
-      } catch (err) {
-        console.error(`[ROOT] Fetch error: ${err.message}`);
-        return maskErrorResponse(502);
-      }
+      return Response.redirect(snow_j6x87yva, 302);
     }
 
     // ── PROXY: بقیه path ها ───────────────────────────────
