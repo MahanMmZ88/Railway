@@ -1,22 +1,12 @@
 {
-  "name": "mahan-railway-relay",
-  "version": "4.0.0",
+  "name": "railway-proxy",
+  "version": "1.0.0",
   "type": "module",
-  "description": "MAHAN Railway CDN Relay with x-host routing",
-  "main": "src/index.js",
   "scripts": {
-    "start": "node --max-old-space-size=512 src/index.js"
+    "start": "node index.js"
   },
-  "engines": {
-    "node": ">=20"
-  },
-  "keywords": [
-    "xray",
-    "vless",
-    "proxy",
-    "relay",
-    "railway"
-  ],
-  "author": "MAHAN",
-  "license": "MIT"
+  "dependencies": {
+    "@hono/node-server": "^1.8.2",
+    "hono": "^4.0.0"
+  }
 }
