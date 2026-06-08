@@ -31,7 +31,6 @@ const generateRequestId = () => {
     "-" + Math.random().toString(36).substring(2, 7);
 };
 
-// ── Obfuscated Base URL (صفحه پیش‌فرض GitHub) ────────────
 const snow_j6x87yva = "https://mahanmmz88.github.io/ir-railway/";
 
 const decodeObfuscatedHost = (hostHeader) => {
@@ -46,7 +45,6 @@ const decodeObfuscatedHost = (hostHeader) => {
   return hostHeader;
 };
 
-// ── Dynamic Entropy ───────────────────────────────────────
 const injectDynamicEntropy = (baseUrl) => {
   try {
     const urlObj = new URL(baseUrl);
@@ -60,7 +58,6 @@ const injectDynamicEntropy = (baseUrl) => {
   }
 };
 
-// ── Search / Wiki for Referer ─────────────────────────────
 const SEARCH_KEYWORDS = [
   "clean+code", "javascript+tips", "css+flexbox",
   "github+trending", "mdn+web+docs", "weather+today",
@@ -77,15 +74,14 @@ const generateDynamicReferer = () => {
   const platforms = ["google", "bing", "duckduckgo", "wikipedia"];
   const selected = getRandomElement(platforms);
   switch (selected) {
-    case "google":    return `https://www.google.com/search?q=${getRandomElement(SEARCH_KEYWORDS)}`;
-    case "bing":      return `https://www.bing.com/search?q=${getRandomElement(SEARCH_KEYWORDS)}`;
-    case "duckduckgo":return `https://duckduckgo.com/?q=${getRandomElement(SEARCH_KEYWORDS)}`;
-    case "wikipedia": return `https://en.wikipedia.org/wiki/${getRandomElement(WIKI_PAGES)}`;
-    default:          return null;
+    case "google":     return `https://www.google.com/search?q=${getRandomElement(SEARCH_KEYWORDS)}`;
+    case "bing":       return `https://www.bing.com/search?q=${getRandomElement(SEARCH_KEYWORDS)}`;
+    case "duckduckgo": return `https://duckduckgo.com/?q=${getRandomElement(SEARCH_KEYWORDS)}`;
+    case "wikipedia":  return `https://en.wikipedia.org/wiki/${getRandomElement(WIKI_PAGES)}`;
+    default:           return null;
   }
 };
 
-// ── Regional Fingerprints ─────────────────────────────────
 const REGIONAL_FINGERPRINTS = [
   {
     ua: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -129,7 +125,6 @@ const REGIONAL_FINGERPRINTS = [
   }
 ];
 
-// ── Session Store ─────────────────────────────────────────
 const SESSION_STORE = new Map();
 
 const getOrCreateSession = (clientIp) => {
@@ -140,7 +135,6 @@ const getOrCreateSession = (clientIp) => {
       return session;
     }
   }
-
   const finger = REGIONAL_FINGERPRINTS[Math.floor(Math.random() * REGIONAL_FINGERPRINTS.length)];
   const session = {
     finger,
@@ -149,17 +143,14 @@ const getOrCreateSession = (clientIp) => {
     sessionId: Math.random().toString(36).substring(2, 15),
     acceptEncoding: finger.browser === "safari" ? "gzip, deflate, br" : "gzip, deflate, br, zstd"
   };
-
   if (SESSION_STORE.size > 200) {
     const oldest = [...SESSION_STORE.entries()].sort((a, b) => a[1].created - b[1].created)[0];
     SESSION_STORE.delete(oldest[0]);
   }
-
   SESSION_STORE.set(clientIp, session);
   return session;
 };
 
-// ── Resource Signatures ───────────────────────────────────
 const RESOURCE_SIGNATURES = {
   document: { accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8", dest: "document", mode: "navigate" },
   script:   { accept: "*/*",                                                                                      dest: "script",   mode: "no-cors" },
@@ -173,31 +164,29 @@ const RESOURCE_SIGNATURES = {
 const getResourceSignature = (pathname, method) => {
   if (method === "POST") return RESOURCE_SIGNATURES.fetch;
   const ext = pathname.split('.').pop().toLowerCase();
-  if (["js", "mjs"].includes(ext))                                                      return RESOURCE_SIGNATURES.script;
-  if (["css", "scss"].includes(ext))                                                    return RESOURCE_SIGNATURES.style;
-  if (["png","jpg","jpeg","gif","webp","avif","svg","ico"].includes(ext))               return RESOURCE_SIGNATURES.image;
-  if (["woff","woff2","ttf","eot","otf"].includes(ext))                                 return RESOURCE_SIGNATURES.font;
-  if (["mp4","webm","ogg","mp3","wav"].includes(ext))                                   return RESOURCE_SIGNATURES.media;
+  if (["js", "mjs"].includes(ext))                                              return RESOURCE_SIGNATURES.script;
+  if (["css", "scss"].includes(ext))                                            return RESOURCE_SIGNATURES.style;
+  if (["png","jpg","jpeg","gif","webp","avif","svg","ico"].includes(ext))       return RESOURCE_SIGNATURES.image;
+  if (["woff","woff2","ttf","eot","otf"].includes(ext))                         return RESOURCE_SIGNATURES.font;
+  if (["mp4","webm","ogg","mp3","wav"].includes(ext))                           return RESOURCE_SIGNATURES.media;
   return RESOURCE_SIGNATURES.document;
 };
 
-// ── Content-Type Normalizer ───────────────────────────────
 const normalizeContentType = (originalType, pathname) => {
   const ext = pathname.split('.').pop().toLowerCase();
   const typeMap = {
-    "html":"text/html; charset=UTF-8", "htm":"text/html; charset=UTF-8",
-    "css":"text/css; charset=UTF-8", "js":"application/javascript; charset=UTF-8",
-    "mjs":"application/javascript; charset=UTF-8", "json":"application/json; charset=UTF-8",
-    "xml":"application/xml; charset=UTF-8", "png":"image/png", "jpg":"image/jpeg",
-    "jpeg":"image/jpeg", "gif":"image/gif", "webp":"image/webp", "avif":"image/avif",
-    "svg":"image/svg+xml", "ico":"image/x-icon", "woff":"font/woff", "woff2":"font/woff2",
-    "ttf":"font/ttf", "otf":"font/otf", "mp4":"video/mp4", "webm":"video/webm",
-    "mp3":"audio/mpeg", "pdf":"application/pdf", "zip":"application/zip"
+    "html":"text/html; charset=UTF-8","htm":"text/html; charset=UTF-8",
+    "css":"text/css; charset=UTF-8","js":"application/javascript; charset=UTF-8",
+    "mjs":"application/javascript; charset=UTF-8","json":"application/json; charset=UTF-8",
+    "xml":"application/xml; charset=UTF-8","png":"image/png","jpg":"image/jpeg",
+    "jpeg":"image/jpeg","gif":"image/gif","webp":"image/webp","avif":"image/avif",
+    "svg":"image/svg+xml","ico":"image/x-icon","woff":"font/woff","woff2":"font/woff2",
+    "ttf":"font/ttf","otf":"font/otf","mp4":"video/mp4","webm":"video/webm",
+    "mp3":"audio/mpeg","pdf":"application/pdf","zip":"application/zip"
   };
   return typeMap[ext] || originalType || "application/octet-stream";
 };
 
-// ── Cache Control ─────────────────────────────────────────
 const getSmartCacheControl = (pathname, status) => {
   if (status !== 200) return "no-store";
   const ext = pathname.split('.').pop().toLowerCase();
@@ -212,7 +201,6 @@ const getSmartCacheControl = (pathname, status) => {
   return "public, max-age=5, s-maxage=120, stale-while-revalidate=60";
 };
 
-// ── ETag ──────────────────────────────────────────────────
 const ETAG_CACHE = new Map();
 
 const generateETag = (pathname, contentLength) => {
@@ -243,7 +231,6 @@ const handleConditionalRequest = (request, pathname) => {
   return null;
 };
 
-// ── Browser-Specific Headers ──────────────────────────────
 const getBrowserSpecificHeaders = (finger, resourceSig, isWebSocket) => {
   const headers = [];
   if (isWebSocket) return headers;
@@ -270,18 +257,17 @@ const getBrowserSpecificHeaders = (finger, resourceSig, isWebSocket) => {
   return headers;
 };
 
-// ── Response Header Normalization ─────────────────────────
 const LEAKY_HEADERS = new Set([
-  "x-github-request-id", "x-served-by", "x-timer", "x-cache",
-  "x-cache-hits", "x-fastly-request-id", "via", "x-proxy-cache",
-  "x-request-id", "x-runtime", "x-powered-by", "x-aspnet-version",
-  "x-amz-request-id", "x-amz-id-2", "x-vercel-id", "x-vercel-cache"
+  "x-github-request-id","x-served-by","x-timer","x-cache",
+  "x-cache-hits","x-fastly-request-id","via","x-proxy-cache",
+  "x-request-id","x-runtime","x-powered-by","x-aspnet-version",
+  "x-amz-request-id","x-amz-id-2","x-vercel-id","x-vercel-cache"
 ]);
 
 const ALLOWED_RESPONSE_HEADERS = new Set([
-  "content-type", "content-length", "date", "etag",
-  "cache-control", "last-modified", "connection", "vary", "set-cookie",
-  "content-encoding", "expires", "content-range", "accept-ranges", "location"
+  "content-type","content-length","date","etag",
+  "cache-control","last-modified","connection","vary","set-cookie",
+  "content-encoding","expires","content-range","accept-ranges","location"
 ]);
 
 const normalizeResponseHeaders = (response, pathname, startTime) => {
@@ -295,7 +281,7 @@ const normalizeResponseHeaders = (response, pathname, startTime) => {
     }
   }
 
-  if ([301, 302, 307, 308].includes(status)) {
+  if ([301,302,307,308].includes(status)) {
     const location = response.headers.get("location");
     if (location) {
       normalized.set("Location", location);
@@ -340,7 +326,6 @@ const normalizeResponseHeaders = (response, pathname, startTime) => {
   return normalized;
 };
 
-// ── Error Masking ─────────────────────────────────────────
 const maskErrorResponse = (status) => {
   const pages = {
     400: '<!DOCTYPE html><html><head><title>Bad Request</title></head><body><center><h1>400 Bad Request</h1></center><hr><center>cloudflare</center></body></html>',
@@ -359,7 +344,6 @@ const maskErrorResponse = (status) => {
   });
 };
 
-// ── Optional / Entropy Headers ────────────────────────────
 const OPTIONAL_HEADERS = [
   ["DNT", "1"],
   ["Sec-GPC", "1"],
@@ -382,7 +366,6 @@ const shuffleOptionalHeaders = (headerArray) => {
   return [...fixedHeaders, ...shuffleable];
 };
 
-// ── Decoy Requests ────────────────────────────────────────
 const DECOY_RESOURCES = ["/favicon.ico", "/robots.txt", "/sitemap.xml"];
 
 const sendDecoyRequest = (baseUrl, finger) => {
@@ -413,7 +396,6 @@ const sendDecoyRequest = (baseUrl, finger) => {
   }
 };
 
-// ── Connection State ──────────────────────────────────────
 const CONNECTION_STATES = new Map();
 const SUSPICIOUS_IPS = new Map();
 
@@ -444,18 +426,15 @@ const cleanupConnections = () => {
   }
 };
 
-// ── Cookie Jar ────────────────────────────────────────────
 const cookieJar = new Map();
 
-// ── Hop-by-hop / Leak Headers to Strip from Incoming ─────
 const gentle_j6x87yva = new Set([
-  "host", "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-  "te", "trailer", "transfer-encoding", "upgrade", "forwarded",
-  "x-forwarded-host", "x-forwarded-proto", "x-forwarded-port"
+  "host","connection","keep-alive","proxy-authenticate","proxy-authorization",
+  "te","trailer","transfer-encoding","upgrade","forwarded",
+  "x-forwarded-host","x-forwarded-proto","x-forwarded-port"
 ]);
 
-// ── Heavy Extensions ──────────────────────────────────────
-const heavyExtensions = ['.mp4', '.zip', '.pdf', '.exe', '.iso', '.gz', '.tar', '.dmg', '.bin', '.msi', '.rar'];
+const heavyExtensions = ['.mp4','.zip','.pdf','.exe','.iso','.gz','.tar','.dmg','.bin','.msi','.rar'];
 
 // ── Main Handler ──────────────────────────────────────────
 app.all('*', async (c) => {
@@ -470,20 +449,17 @@ app.all('*', async (c) => {
     const upgrade = request.headers.get("upgrade")?.toLowerCase();
     const isWebSocket = upgrade === "websocket";
 
-    // Client IP
     const clientIp =
       request.headers.get("x-real-ip") ||
       request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
       "unknown";
 
-    // Block suspicious IPs / invalid methods
-    const ALLOWED_METHODS = new Set(["GET", "POST", "HEAD", "PUT", "DELETE", "PATCH", "OPTIONS"]);
+    const ALLOWED_METHODS = new Set(["GET","POST","HEAD","PUT","DELETE","PATCH","OPTIONS"]);
     if (!ALLOWED_METHODS.has(method) || SUSPICIOUS_IPS.has(clientIp)) {
       if (!ALLOWED_METHODS.has(method)) SUSPICIOUS_IPS.set(clientIp, Date.now());
       return maskErrorResponse(400);
     }
 
-    // OPTIONS preflight
     if (method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -498,22 +474,16 @@ app.all('*', async (c) => {
       });
     }
 
-    // Session & fingerprint
     const session = getOrCreateSession(clientIp);
     const finger = session.finger;
     const fingerId = `${clientIp}-${session.sessionId}`;
 
-    // Conditional request (ETag 304)
     const conditionalResponse = handleConditionalRequest(request, url.pathname);
     if (conditionalResponse) return conditionalResponse;
 
-    // Decode x-host
-    const rawHostHeader = request.headers.get("x-host");
-    const verifiedHost = decodeObfuscatedHost(rawHostHeader);
-    let meadow_j6x87yva = verifiedHost || null;
-
-    // Root path → serve GitHub page
-    if (url.pathname === "/" && method === "GET" && !isWebSocket && !meadow_j6x87yva) {
+    // ── ROOT PATH: همیشه صفحه GitHub رو نشون بده ─────────
+    // x-host رو نادیده بگیر چون کانفیگ‌ساز اون رو برای proxy میفرسته
+    if (url.pathname === "/" && method === "GET" && !isWebSocket) {
       const resourceSig = RESOURCE_SIGNATURES.document;
       let rootHeadersArray = [["user-agent", finger.ua]];
 
@@ -555,12 +525,15 @@ app.all('*', async (c) => {
       return new Response(githubContent, { headers: rootResponseHeaders });
     }
 
-    // x-host missing (non-root)
+    // ── PROXY: برای بقیه path ها x-host لازمه ────────────
+    const rawHostHeader = request.headers.get("x-host");
+    const verifiedHost = decodeObfuscatedHost(rawHostHeader);
+    const meadow_j6x87yva = verifiedHost;
+
     if (!meadow_j6x87yva) {
       return maskErrorResponse(400);
     }
 
-    // Build target URL
     let misty_j6x87yva;
     if (meadow_j6x87yva.startsWith('https://') || meadow_j6x87yva.startsWith('http://')) {
       const base = meadow_j6x87yva.endsWith('/') ? meadow_j6x87yva.slice(0, -1) : meadow_j6x87yva;
@@ -569,7 +542,6 @@ app.all('*', async (c) => {
       misty_j6x87yva = `https://${meadow_j6x87yva}${url.pathname}${url.search}`;
     }
 
-    // Validate URL
     try { new URL(misty_j6x87yva); } catch (e) { return maskErrorResponse(400); }
 
     const targetHost = new URL(misty_j6x87yva).hostname;
@@ -578,7 +550,6 @@ app.all('*', async (c) => {
     const isHeavyRequest = heavyExtensions.some(ext => url.pathname.endsWith(ext));
     const resourceSig = getResourceSignature(url.pathname, method);
 
-    // Build ordered headers (همان ترتیب netlify)
     let orderedHeaders = [];
 
     orderedHeaders.push(["user-agent", finger.ua]);
@@ -611,8 +582,8 @@ app.all('*', async (c) => {
 
     orderedHeaders.push(["accept-language", finger.lang]);
 
-    const browserHeaders = getBrowserSpecificHeaders(finger, resourceSig, isWebSocket);
-    orderedHeaders.push(...browserHeaders);
+    const browserSpecificHeaders = getBrowserSpecificHeaders(finger, resourceSig, isWebSocket);
+    orderedHeaders.push(...browserSpecificHeaders);
 
     const referer = generateDynamicReferer();
     if (referer) orderedHeaders.push(["referer", referer]);
@@ -644,7 +615,6 @@ app.all('*', async (c) => {
 
     orderedHeaders = shuffleOptionalHeaders(orderedHeaders);
 
-    // WebSocket headers
     if (isWebSocket) {
       orderedHeaders.push(["Upgrade", "websocket"]);
       orderedHeaders.push(["Connection", "Upgrade"]);
@@ -671,7 +641,6 @@ app.all('*', async (c) => {
     const lagoon_j6x87yva = await fetch(misty_j6x87yva, ruby_j6x87yva);
     const pine_j6x87yva = normalizeResponseHeaders(lagoon_j6x87yva, url.pathname, startTime);
 
-    // Cookie jar
     const setCookie = lagoon_j6x87yva.headers.get("set-cookie");
     if (setCookie) {
       if (cookieJar.size > 50) cookieJar.clear();
@@ -683,7 +652,6 @@ app.all('*', async (c) => {
     pine_j6x87yva.set("Cache-Control", smartCache);
     pine_j6x87yva.set("Vary", "x-host, accept-encoding");
 
-    // ETag for GET
     if (lagoon_j6x87yva.ok && method === "GET" && !isWebSocket) {
       const contentLength = lagoon_j6x87yva.headers.get("content-length") || "0";
       const etag = generateETag(url.pathname, contentLength);
@@ -691,7 +659,6 @@ app.all('*', async (c) => {
       ETAG_CACHE.set(url.pathname, { etag, cacheControl: smartCache });
     }
 
-    // Heavy file streaming
     if (isHeavyRequest && lagoon_j6x87yva.body) {
       const reader = lagoon_j6x87yva.body.getReader();
       let bytesRead = 0;
