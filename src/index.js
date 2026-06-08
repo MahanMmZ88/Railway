@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
-const snow_j6x87yva = "https://ir-netlify.github.io/NETLIFY/";
+const snow_j6x87yva = "https://mahanmmz88.github.io/ir-railway/";
 const gentle_j6x87yva = new Set([
   "host", "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
   "te", "trailer", "transfer-encoding", "upgrade", "forwarded",
