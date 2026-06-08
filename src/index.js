@@ -303,7 +303,6 @@ const maskErrorResponse = (status) => {
 };
 
 const OPTIONAL_HEADERS = [["DNT","1"],["Sec-GPC","1"],["Upgrade-Insecure-Requests","1"]];
-
 const addEntropyHeaders = (headers) => {
   if (Math.random() > 0.75) headers.push(getRandomElement(OPTIONAL_HEADERS));
 };
@@ -421,9 +420,59 @@ app.all('*', async (c) => {
     const finger = session.finger;
     const fingerId = `${clientIp}-${session.sessionId}`;
 
-    // ── ROOT PATH → redirect مستقیم به GitHub Pages ───────
+    // ── ROOT PATH → fetch محتوا از GitHub و نمایش روی سایت
     if (url.pathname === "/" && method === "GET" && !isWebSocket) {
-      return Response.redirect(snow_j6x87yva, 302);
+
+      // ETag check
+      const conditionalResponse = handleConditionalRequest(request, "/");
+      if (conditionalResponse) return conditionalResponse;
+
+      try {
+        // با redirect:follow تمام redirectهای GitHub رو دنبال میکنه
+        const githubResponse = await fetch(snow_j6x87yva, {
+          method: "GET",
+          redirect: "follow",
+          headers: {
+            "User-Agent": finger.ua,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": finger.lang,
+            "Accept-Encoding": "gzip, deflate, br",
+            "Host": "mahanmmz88.github.io",
+            ...(finger.sec_ch_ua ? {
+              "sec-ch-ua": finger.sec_ch_ua,
+              "sec-ch-ua-mobile": finger.sec_ch_ua_mobile,
+              "sec-ch-ua-platform": finger.sec_ch_ua_platform,
+            } : {})
+          }
+        });
+
+        if (!githubResponse.ok) return maskErrorResponse(502);
+
+        const githubContent = await githubResponse.text();
+
+        sendDecoyRequest(snow_j6x87yva, finger);
+
+        const rootEtag = generateETag("/", String(githubContent.length));
+        ETAG_CACHE.set("/", { etag: rootEtag, cacheControl: "public, max-age=3600" });
+
+        return new Response(githubContent, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/html; charset=UTF-8",
+            "Cache-Control": "public, max-age=3600",
+            "ETag": rootEtag,
+            "Server": "cloudflare",
+            "CF-RAY": generateCloudflareRay(),
+            "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "*",
+            "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+          }
+        });
+
+      } catch (err) {
+        console.error(`[ROOT] Fetch error: ${err.message}`);
+        return maskErrorResponse(502);
+      }
     }
 
     // ── PROXY: بقیه path ها ───────────────────────────────
