@@ -1,10 +1,10 @@
 {
-  "name": "mahan",
+  "name": "mahan-railway-relay",
   "version": "1.0.0",
   "type": "module",
-  "description": "Railway core relay powered by MAHAN CLOUD NETWORK",
+  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js"
+    "start": "node index.js"
   },
   "engines": {
     "node": ">=20"
