@@ -1,4 +1,6 @@
 import http from "node:http";
+import net from "node:net";
+import tls from "node:tls";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 
@@ -16,20 +18,24 @@ const STRIP_HEADERS = new Set([
 const cleanHeaders = (incomingHeaders, isWebSocket = false) => {
   const cleaned = {};
   
-  for (const [key, value] of Object.entries(incomingHeaders)) {
-    const lowerKey = key.toLowerCase();
-    
-    // حذف headers غیرضروری
-    if (STRIP_HEADERS.has(lowerKey)) continue;
-    if (lowerKey === "x-host") continue; // این header فقط برای ما است
-    
-    // برای WebSocket، برخی headers را نگه می‌داریم
-    if (isWebSocket && ["upgrade", "connection"].includes(lowerKey)) {
+  try {
+    for (const [key, value] of Object.entries(incomingHeaders)) {
+      const lowerKey = key.toLowerCase();
+      
+      // حذف headers غیرضروری
+      if (STRIP_HEADERS.has(lowerKey)) continue;
+      if (lowerKey === "x-host") continue;
+      
+      // برای WebSocket، برخی headers را نگه می‌داریم
+      if (isWebSocket && ["upgrade", "connection"].includes(lowerKey)) {
+        cleaned[key] = value;
+        continue;
+      }
+      
       cleaned[key] = value;
-      continue;
     }
-    
-    cleaned[key] = value;
+  } catch (error) {
+    console.error("Error cleaning headers:", error.message);
   }
   
   return cleaned;
@@ -46,21 +52,27 @@ const extractTarget = (xHost) => {
       return decoded.trim();
     }
     return xHost.trim();
-  } catch (e) {
+  } catch (error) {
+    console.error("Error extracting target:", error.message);
     return xHost.trim();
   }
 };
 
 // تابع: ساخت URL هدف
 const buildTargetUrl = (target, pathname, search) => {
-  // اگر target قبلاً protocol دارد
-  if (target.startsWith('http://') || target.startsWith('https://')) {
-    const base = target.endsWith('/') ? target.slice(0, -1) : target;
-    return `${base}${pathname}${search}`;
+  try {
+    // اگر target قبلاً protocol دارد
+    if (target.startsWith('http://') || target.startsWith('https://')) {
+      const base = target.endsWith('/') ? target.slice(0, -1) : target;
+      return `${base}${pathname}${search}`;
+    }
+    
+    // اگر فقط domain:port است
+    return `https://${target}${pathname}${search}`;
+  } catch (error) {
+    console.error("Error building target URL:", error.message);
+    return null;
   }
-  
-  // اگر فقط domain:port است
-  return `https://${target}${pathname}${search}`;
 };
 
 // تابع: نمایش صفحه Config Generator
@@ -355,62 +367,86 @@ function copyAllConfigs() {
 </body>
 </html>`;
 
-  res.writeHead(200, {
-    "Content-Type": "text/html; charset=UTF-8",
-    "Cache-Control": "public, max-age=3600"
-  });
-  res.end(html);
+  try {
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=UTF-8",
+      "Cache-Control": "public, max-age=3600"
+    });
+    res.end(html);
+  } catch (error) {
+    console.error("Error serving config generator:", error.message);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Internal Server Error");
+    }
+  }
 };
 
 // تابع: Proxy اصلی
 const proxyRequest = async (req, res) => {
-  const xHost = req.headers['x-host'];
-  const target = extractTarget(xHost);
-  
-  if (!target) {
-    res.writeHead(400, { "Content-Type": "text/plain" });
-    return res.end("Bad Request: x-host header is missing or invalid");
-  }
-
-  const targetUrl = buildTargetUrl(target, req.url, '');
-  
-  // بررسی صحت URL
   try {
-    new URL(targetUrl);
-  } catch (e) {
-    res.writeHead(400, { "Content-Type": "text/plain" });
-    return res.end("Bad Request: Invalid target URL");
-  }
+    const xHost = req.headers['x-host'];
+    const target = extractTarget(xHost);
+    
+    if (!target) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      return res.end("Bad Request: x-host header is missing or invalid");
+    }
 
-  // آماده‌سازی headers
-  const forwardHeaders = cleanHeaders(req.headers, false);
-  
-  // Forward client IP
-  const clientIp = req.headers['x-forwarded-for'] || 
-                   req.connection.remoteAddress || 
-                   req.socket.remoteAddress;
-  if (clientIp) {
-    forwardHeaders['x-forwarded-for'] = clientIp;
-  }
+    const targetUrl = buildTargetUrl(target, req.url || '/', '');
+    
+    if (!targetUrl) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      return res.end("Bad Request: Could not build target URL");
+    }
+    
+    // بررسی صحت URL
+    try {
+      new URL(targetUrl);
+    } catch (e) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      return res.end("Bad Request: Invalid target URL");
+    }
 
-  // Options برای fetch
-  const fetchOptions = {
-    method: req.method,
-    headers: forwardHeaders,
-    redirect: "manual"
-  };
+    // آماده‌سازی headers
+    const forwardHeaders = cleanHeaders(req.headers, false);
+    
+    // Forward client IP
+    const clientIp = req.headers['x-forwarded-for'] || 
+                     req.connection?.remoteAddress || 
+                     req.socket?.remoteAddress ||
+                     'unknown';
+    if (clientIp) {
+      forwardHeaders['x-forwarded-for'] = clientIp;
+    }
 
-  // اگر body دارد
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    fetchOptions.body = Readable.toWeb(req);
-    fetchOptions.duplex = "half";
-  }
+    // Options برای fetch
+    const fetchOptions = {
+      method: req.method,
+      headers: forwardHeaders,
+      redirect: "manual"
+    };
 
-  try {
+    // اگر body دارد
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      try {
+        fetchOptions.body = Readable.toWeb(req);
+        fetchOptions.duplex = "half";
+      } catch (bodyError) {
+        console.error("Error reading request body:", bodyError.message);
+      }
+    }
+
     const response = await fetch(targetUrl, fetchOptions);
     
+    // کپی headers
+    const responseHeaders = {};
+    for (const [key, value] of response.headers.entries()) {
+      responseHeaders[key] = value;
+    }
+    
     // Set status و headers
-    res.writeHead(response.status, response.statusText, response.headers);
+    res.writeHead(response.status, response.statusText, responseHeaders);
     
     // Stream کردن response body
     if (response.body) {
@@ -424,39 +460,67 @@ const proxyRequest = async (req, res) => {
     if (!res.headersSent) {
       res.writeHead(502, { "Content-Type": "text/plain" });
       res.end("Bad Gateway: Could not reach target server");
+    } else {
+      // اگر headers فرستاده شده، فقط connection را ببند
+      res.destroy();
     }
   }
 };
 
 // تابع: مدیریت WebSocket
-const handleWebSocketUpgrade = (req, socket, head) => {
-  const xHost = req.headers['x-host'];
-  const target = extractTarget(xHost);
-  
-  if (!target) {
-    socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
-    socket.destroy();
-    return;
-  }
-
-  const targetUrl = buildTargetUrl(target, req.url, '');
-  
+const handleWebSocketUpgrade = async (req, socket, head) => {
   try {
+    const xHost = req.headers['x-host'];
+    const target = extractTarget(xHost);
+    
+    if (!target) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    const targetUrl = buildTargetUrl(target, req.url || '/', '');
+    
+    if (!targetUrl) {
+      socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    
     const url = new URL(targetUrl);
     const isSecure = url.protocol === 'https:';
     const targetPort = url.port || (isSecure ? 443 : 80);
     const targetHost = url.hostname;
 
     // ایجاد اتصال به سرور هدف
-    const netModule = isSecure ? await import('tls') : await import('net');
-    
     const targetSocket = isSecure
-      ? netModule.connect({ host: targetHost, port: targetPort, servername: targetHost })
-      : netModule.connect({ host: targetHost, port: targetPort });
+      ? tls.connect({ 
+          host: targetHost, 
+          port: targetPort, 
+          servername: targetHost,
+          rejectUnauthorized: false 
+        })
+      : net.connect({ 
+          host: targetHost, 
+          port: targetPort 
+        });
+
+    // Timeout برای اتصال
+    targetSocket.setTimeout(30000);
 
     targetSocket.on('error', (err) => {
       console.error('WebSocket target error:', err.message);
-      socket.destroy();
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
+    });
+
+    targetSocket.on('timeout', () => {
+      console.error('WebSocket target timeout');
+      targetSocket.destroy();
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
     });
 
     // آماده‌سازی headers برای upgrade
@@ -474,7 +538,7 @@ const handleWebSocketUpgrade = (req, socket, head) => {
     upgradeRequest += '\r\n';
 
     targetSocket.write(upgradeRequest);
-    if (head.length > 0) {
+    if (head && head.length > 0) {
       targetSocket.write(head);
     }
 
@@ -482,39 +546,127 @@ const handleWebSocketUpgrade = (req, socket, head) => {
     targetSocket.pipe(socket);
     socket.pipe(targetSocket);
 
-    targetSocket.on('close', () => socket.destroy());
-    socket.on('close', () => targetSocket.destroy());
+    targetSocket.on('close', () => {
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
+    });
+    
+    socket.on('close', () => {
+      if (!targetSocket.destroyed) {
+        targetSocket.destroy();
+      }
+    });
+    
+    socket.on('error', (err) => {
+      console.error('Client socket error:', err.message);
+      if (!targetSocket.destroyed) {
+        targetSocket.destroy();
+      }
+    });
     
   } catch (error) {
     console.error('WebSocket upgrade error:', error.message);
-    socket.write('HTTP/1.1 502 Bad Gateway\r\n\r\n');
-    socket.destroy();
+    try {
+      if (!socket.destroyed) {
+        socket.write('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+        socket.destroy();
+      }
+    } catch (e) {
+      console.error('Error sending error response:', e.message);
+    }
   }
 };
 
 // ایجاد سرور HTTP
 const server = http.createServer(async (req, res) => {
-  const xHost = req.headers['x-host'];
-  
-  // اگر x-host header نداریم، صفحه config generator را نمایش بده
-  if (!xHost && req.url === '/') {
-    return serveConfigGenerator(req, res);
+  try {
+    const xHost = req.headers['x-host'];
+    
+    // اگر x-host header نداریم، صفحه config generator را نمایش بده
+    if (!xHost && req.url === '/') {
+      return serveConfigGenerator(req, res);
+    }
+    
+    // اگر x-host نداریم و route دیگری است
+    if (!xHost) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      return res.end("Bad Request: x-host header is required");
+    }
+    
+    // Proxy کردن request
+    await proxyRequest(req, res);
+  } catch (error) {
+    console.error("Server request error:", error.message);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Internal Server Error");
+    }
   }
-  
-  // Proxy کردن request
-  await proxyRequest(req, res);
 });
 
 // مدیریت WebSocket upgrade
-server.on('upgrade', handleWebSocketUpgrade);
+server.on('upgrade', async (req, socket, head) => {
+  try {
+    await handleWebSocketUpgrade(req, socket, head);
+  } catch (error) {
+    console.error("Upgrade handler error:", error.message);
+    if (!socket.destroyed) {
+      socket.destroy();
+    }
+  }
+});
 
-// Error handling
+// Error handling برای سرور
 server.on('error', (err) => {
-  console.error('Server error:', err);
+  console.error('Server error:', err.message);
+});
+
+// Error handling برای client connections
+server.on('clientError', (err, socket) => {
+  console.error('Client error:', err.message);
+  if (!socket.destroyed) {
+    socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+// Unhandled errors
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.message);
+  console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
 });
 
 // شروع سرور
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 MAHAN Railway Relay running on port ${PORT}`);
   console.log(`📡 Ready to proxy requests with x-host header`);
+  console.log(`🌐 Config Generator: http://0.0.0.0:${PORT}/`);
 });
